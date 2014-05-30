@@ -10,18 +10,12 @@
 #include <mach-o/arch.h>
 #include <mach-o/loader.h>
 #include <mach-o/fat.h>
-#include <Security/Security.h>
 
 #include <sys/mman.h>
 #include <sys/stat.h>
 
-#include <openssl/objects.h>
 #include <openssl/x509.h>
 #include <openssl/pkcs7.h>
-
-const struct mach_header *header;
-const struct mach_header_64 *header64;
-size_t header_size;
 
 static uint32_t funcSwap32(uint32_t input)
 {
@@ -133,7 +127,7 @@ error:
 
 BOOL parseSignature(const char* buffer, size_t size)
 {
-	NSLog(@"Signature");
+	printf("Signature\n");
 	
 	CS_SuperBlob* sb = (CS_SuperBlob*)buffer;
     if (OSSwapBigToHostInt32(sb->blob.magic) != kSecCodeMagicEmbeddedSignature)
@@ -151,7 +145,7 @@ BOOL parseSignature(const char* buffer, size_t size)
 		
         if (OSSwapBigToHostInt32(blob->magic) == 0xfade0b01) //signature
 		{
-			NSLog(@"Embedded signature, length: %d", OSSwapBigToHostInt32(blob->length));
+			printf("Embedded signature, length: %d\n", OSSwapBigToHostInt32(blob->length));
 			
 			if (OSSwapBigToHostInt32(blob->length) != 8)
 			{
@@ -181,7 +175,7 @@ BOOL parseSignature(const char* buffer, size_t size)
 
 BOOL parseArch(const char* buffer, size_t size)
 {
-	NSLog(@"Arch");
+	printf("Arch\n");
 	
 	uint32_t (*swap32)(uint32_t) = funcNoSwap32;
 	
@@ -209,7 +203,7 @@ BOOL parseArch(const char* buffer, size_t size)
 	const NXArchInfo *archInfo = NXGetArchInfoFromCpuType(swap32(header->cputype), swap32(header->cpusubtype));
 	if (archInfo != NULL)
 	{
-		NSLog(@"Architecture: %s\n", archInfo->name);
+		printf("Architecture: %s\n", archInfo->name);
 	}
 	
 	uint32_t commandCount = swap32(header->ncmds);
@@ -238,7 +232,7 @@ BOOL parseArch(const char* buffer, size_t size)
 
 BOOL parseFat(const char* buffer, size_t size)
 {
-	NSLog(@"FAT");
+	printf("FAT\n");
 	
 	size_t offset = 0;
 	
@@ -247,7 +241,7 @@ BOOL parseFat(const char* buffer, size_t size)
 	
 	uint32_t archCount = OSSwapBigToHostInt32(fatHeader->nfat_arch);
 	
-	NSLog(@"Arch count: %d", archCount);
+	printf("Arch count: %d\n", archCount);
 	
 	for (uint32_t i = 0; i < archCount; i++)
 	{
@@ -284,40 +278,45 @@ BOOL parseMachO(const char* buffer, size_t size)
 BOOL checkSignature()
 {
 	BOOL result = NO;
+	char* buffer = NULL;
 	
 	NSString* appPath = [[NSBundle mainBundle] executablePath];
-	NSLog(@"Path: %@", appPath);
+	printf("Path: %s\n", [appPath cStringUsingEncoding:NSASCIIStringEncoding]);
 	
 	int fd = open([appPath cStringUsingEncoding:NSASCIIStringEncoding], O_RDONLY);
 	
 	if (fd == -1)
 	{
-		return NO;
+		goto error;
 	}
 	
 	struct stat st;
 	fstat(fd, &st);
 	
-	char* buffer = mmap(NULL, (size_t)st.st_size, PROT_READ, MAP_FILE|MAP_PRIVATE, fd, 0);
+	buffer = mmap(NULL, (size_t)st.st_size, PROT_READ, MAP_FILE|MAP_PRIVATE, fd, 0);
 	
 	if (buffer == MAP_FAILED)
 	{
-		return NO;
+		goto error;
 	}
 	
-	NSLog(@"File opened");
+	printf("File opened\n");
 	
 	result = parseMachO(buffer, (size_t)st.st_size);
 	
-	munmap(buffer, (size_t)st.st_size);
-	close(fd);
+error:
+	if (buffer) munmap(buffer, (size_t)st.st_size);
+	if (fd != -1) close(fd);
 	
 	return result;
 }
 
 int main(int argc, const char * argv[])
 {
-	checkSignature();
+	if (checkSignature())
+	{
+		printf("OK\n");
+	}
 	
     return 0;
 }
