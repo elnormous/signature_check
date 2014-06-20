@@ -114,7 +114,14 @@ BOOL parsePKCS7(const unsigned char* buffer, size_t size)
 	}
 	
 	printf("Signer name: %s\n", cert->name);
-	printf("Signature: %s, length: %d\n", cert->signature->data, cert->signature->length);
+	printf("Signature length: %d, signature: ", cert->cert_info->key->public_key->length);
+	
+	for (int i = 0; i < cert->cert_info->key->public_key->length; i++)
+	{
+		printf("0x%x, ", cert->cert_info->key->public_key->data[i]);
+	}
+	
+	printf("\n");
 	
 	result = YES;
 	
@@ -149,16 +156,9 @@ BOOL parseSignature(const char* buffer, size_t size)
 			
 			if (OSSwapBigToHostInt32(blob->length) != 8)
 			{
-				/*FILE* f = fopen("/Users/elviss/Desktop/signature.txt", "wb");
-				 fwrite(buffer + offset + 8, OSSwapBigToHostInt32(blob->length) - 8, 1, f);
-				 fclose(f);*/
-				
-				//CFDataRef message = CFDataCreate(kCFAllocatorDefault, (const UInt8*)(buffer + offset + 8), OSSwapBigToHostInt32(blob->length) - 8);
-				//SecCertificateRef certificate = SecCertificateCreateWithData(NULL, message);
-				//CFRelease(message);
-				//SecCodeCheckValidity();
-				//SecRequirementRef
-				//CFStringRef certificateDescription = SecCertificateCopySubjectSummary(certificate);
+//				FILE* f = fopen("/Users/elviss/Desktop/signature.txt", "wb");
+//				fwrite(buffer + offset + 8, OSSwapBigToHostInt32(blob->length) - 8, 1, f);
+//				fclose(f);
 				
 				const unsigned char* message = (const unsigned char*)buffer + offset + 8;
 				
@@ -283,7 +283,10 @@ BOOL checkSignature()
 	NSString* appPath = [[NSBundle mainBundle] executablePath];
 	printf("Path: %s\n", [appPath cStringUsingEncoding:NSASCIIStringEncoding]);
 	
-	int fd = open([appPath cStringUsingEncoding:NSASCIIStringEncoding], O_RDONLY);
+	//int fd = open([appPath cStringUsingEncoding:NSASCIIStringEncoding], O_RDONLY);
+	int fd = open("/Users/elviss/Library/Developer/Xcode/DerivedData/SwiftTest-btixclnafwwpwdgofdfhjuzmntot/Build/Products/Debug-iphoneos/SwiftTest.app/SwiftTest", O_RDONLY);
+	
+	//int fd = open("/Users/elviss/Desktop/app/ParticleCreator 1.0/Payload/ParticleCreator.app/ParticleCreator", O_RDONLY);
 	
 	if (fd == -1)
 	{
