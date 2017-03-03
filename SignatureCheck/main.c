@@ -5,23 +5,20 @@
 //  Created by Elviss Strazdins on 30.05.2014.
 //  Copyright (c) 2014 Elviss. All rights reserved.
 //
-#import <Foundation/Foundation.h>
-#include <TargetConditionals.h>
 #include <mach-o/arch.h>
 #include <mach-o/loader.h>
 #include <mach-o/fat.h>
 
+#include <string.h>
+#include <fcntl.h>
+#include <unistd.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 
 #include <openssl/x509.h>
 #include <openssl/pkcs7.h>
 
-#if TARGET_OS_IPHONE
-static const unsigned char PUBLIC_KEY[] = {};
-#elif TARGET_OS_MAC
 static const unsigned char PUBLIC_KEY[] = {0x30, 0x82, 0x01, 0x0a, 0x02, 0x82, 0x01, 0x01, 0x00, 0xc0, 0x3e, 0x43, 0xd4, 0x54, 0x51, 0x43, 0xe7, 0xc4, 0xd9, 0xd6, 0x07, 0xcb, 0x63, 0xcc, 0x4e, 0x8f, 0x77, 0x07, 0x65, 0x22, 0xaf, 0x3d, 0x79, 0xae, 0x3e, 0x9e, 0x0a, 0x72, 0x5d, 0x86, 0x99, 0x56, 0x23, 0xa5, 0xf9, 0xad, 0xf7, 0xb0, 0x9e, 0xf8, 0x1b, 0x53, 0x08, 0x3e, 0x22, 0x30, 0x66, 0x16, 0x2a, 0x90, 0xf1, 0x6d, 0x2d, 0x35, 0x6e, 0xea, 0x18, 0xa6, 0x36, 0x52, 0x3c, 0x11, 0x0a, 0x34, 0x9a, 0xe3, 0x53, 0x7b, 0x86, 0x9e, 0xa9, 0xc9, 0x18, 0x42, 0x31, 0x0d, 0xb6, 0xe7, 0x03, 0xb3, 0x77, 0x09, 0xc6, 0xff, 0x73, 0x59, 0xa4, 0xdf, 0xbe, 0x3e, 0x89, 0x79, 0x06, 0x22, 0x44, 0x9d, 0xf2, 0x26, 0xab, 0x29, 0x44, 0xe2, 0xb8, 0xe8, 0x2d, 0x42, 0x21, 0xc0, 0x6c, 0x53, 0xee, 0x57, 0x93, 0xec, 0xdd, 0x2c, 0xb8, 0xb4, 0x72, 0xdd, 0x5f, 0xf5, 0x98, 0x3e, 0x14, 0x9e, 0x51, 0x8f, 0x4a, 0xa9, 0x4c, 0x92, 0x00, 0x16, 0x18, 0xf7, 0x76, 0x5f, 0xa6, 0x54, 0xc2, 0x48, 0xce, 0xcd, 0xbd, 0xff, 0xf9, 0xe2, 0x1a, 0xc2, 0xe8, 0x11, 0xf8, 0xbf, 0x9e, 0x2a, 0xd1, 0x94, 0xee, 0x7d, 0x1b, 0xb3, 0x88, 0xa5, 0xa0, 0x6b, 0xfb, 0xd9, 0x4a, 0x09, 0xfa, 0x84, 0x18, 0x85, 0xac, 0x0b, 0xbc, 0xdc, 0xf3, 0xbf, 0xae, 0xaf, 0xfb, 0xc2, 0x98, 0x67, 0xd7, 0xbd, 0xf0, 0xc6, 0xe0, 0xa4, 0xa0, 0xb2, 0x67, 0x9e, 0x53, 0xea, 0x63, 0x35, 0x1d, 0xf7, 0x4e, 0x13, 0xee, 0xd9, 0x11, 0x61, 0xd0, 0x15, 0xa2, 0xf6, 0x70, 0x5b, 0x82, 0x73, 0xb0, 0xf0, 0xcf, 0x88, 0xd7, 0x90, 0xe8, 0xda, 0x54, 0x72, 0x68, 0xce, 0x51, 0x67, 0x1a, 0xc8, 0x03, 0xc9, 0x6c, 0x0c, 0x11, 0x8d, 0xc4, 0xf2, 0x0f, 0xaa, 0xf6, 0x28, 0x27, 0xc5, 0xab, 0xb2, 0xa1, 0x38, 0x30, 0xfa, 0xa3, 0x2b, 0x13, 0x02, 0x03, 0x01, 0x00, 0x01};
-#endif
 
 static uint32_t funcSwap32(uint32_t input)
 {
@@ -90,9 +87,9 @@ typedef struct __CodeDirectory {
 	/* followed by dynamic content as located by offset fields above */
 } CS_CodeDirectory;
 
-BOOL parsePKCS7(const unsigned char* buffer, size_t size)
+int parsePKCS7(const unsigned char* buffer, size_t size)
 {
-	BOOL result = NO;
+	int result = 0;
 	PKCS7* pkcs7 = NULL;
 	STACK_OF(X509)* signers = NULL;
 	
@@ -130,14 +127,14 @@ BOOL parsePKCS7(const unsigned char* buffer, size_t size)
 	
 	if (memcmp(PUBLIC_KEY, cert->cert_info->key->public_key->data, cert->cert_info->key->public_key->length) == 0)
 	{
-		printf("The same\n");
+        printf("The same\n");
+        result = 1;
 	}
     else
     {
         printf("Not the same\n");
+        result = 0;
     }
-	
-	result = YES;
 	
 error:
 	if (signers) sk_X509_free(signers);
@@ -146,14 +143,14 @@ error:
 	return result;
 }
 
-BOOL parseSignature(const char* buffer, size_t size)
+int parseSignature(const char* buffer, size_t size)
 {
 	printf("Signature\n");
 	
 	CS_SuperBlob* sb = (CS_SuperBlob*)buffer;
     if (OSSwapBigToHostInt32(sb->blob.magic) != kSecCodeMagicEmbeddedSignature)
 	{
-		return NO;
+		return 0;
 	}
 	
 	uint32_t count = OSSwapBigToHostInt32(sb->count);
@@ -170,24 +167,20 @@ BOOL parseSignature(const char* buffer, size_t size)
 			
 			if (OSSwapBigToHostInt32(blob->length) != 8)
 			{
-//				FILE* f = fopen("/Users/elviss/Desktop/signature.txt", "wb");
-//				fwrite(buffer + offset + 8, OSSwapBigToHostInt32(blob->length) - 8, 1, f);
-//				fclose(f);
-				
 				const unsigned char* message = (const unsigned char*)buffer + offset + 8;
 				
-				if (parsePKCS7(message, (OSSwapBigToHostInt32(blob->length) - 8)) == NO)
+				if (parsePKCS7(message, (OSSwapBigToHostInt32(blob->length) - 8)) == 0)
 				{
-					return NO;
+					return 0;
 				}
 			}
 		}
 	}
 	
-	return YES;
+	return 1;
 }
 
-BOOL parseArch(const char* buffer, size_t size)
+int parseArch(const char* buffer, size_t size)
 {
 	printf("Arch\n");
 	
@@ -210,7 +203,7 @@ BOOL parseArch(const char* buffer, size_t size)
 			offset += sizeof(struct mach_header_64);
 			break;
 		default:
-			return NO;
+			return 0;
 	}
 	
 	//TODO: remove
@@ -239,12 +232,13 @@ BOOL parseArch(const char* buffer, size_t size)
 		
 		offset += commandSize;
 	}
-	
-	//no signature found
-	return NO;
+
+    printf("Signature not found\n");
+
+	return 0;
 }
 
-BOOL parseFat(const char* buffer, size_t size)
+int parseFat(const char* buffer, size_t size)
 {
 	printf("FAT\n");
 	
@@ -267,14 +261,14 @@ BOOL parseFat(const char* buffer, size_t size)
 		
 		if (!parseArch(buffer + archOffset, archSize))
 		{
-			return NO;
+			return 0;
 		}
 	}
 	
-	return YES;
+	return 1;
 }
 
-BOOL parseMachO(const char* buffer, size_t size)
+int parseMachO(const char* buffer, size_t size)
 {
 	const uint32_t* magic = (const uint32_t*)buffer;
 	
@@ -289,21 +283,12 @@ BOOL parseMachO(const char* buffer, size_t size)
 	}
 }
 
-BOOL checkSignature()
+int checkSignature(const char* filename)
 {
-	BOOL result = NO;
+	int result = 0;
 	char* buffer = NULL;
-	
-	NSString* appPath = [[NSBundle mainBundle] executablePath];
-	printf("Path: %s\n", [appPath cStringUsingEncoding:NSASCIIStringEncoding]);
-	
-    //const char* filename = [appPath cStringUsingEncoding:NSASCIIStringEncoding];
-    const char* filename = "/Applications/TextWrangler.app/Contents/MacOS/TextWrangler";
     
 	int fd = open(filename, O_RDONLY);
-	//int fd = open("/Users/elviss/Library/Developer/Xcode/DerivedData/SwiftTest-btixclnafwwpwdgofdfhjuzmntot/Build/Products/Debug-iphoneos/SwiftTest.app/SwiftTest", O_RDONLY);
-	
-	//int fd = open("/Users/elviss/Desktop/app/ParticleCreator 1.0/Payload/ParticleCreator.app/ParticleCreator", O_RDONLY);
 	
 	if (fd == -1)
 	{
@@ -333,7 +318,7 @@ error:
 
 int main(int argc, const char * argv[])
 {
-	if (checkSignature())
+    if (argc > 0 && checkSignature(argv[0]))
 	{
 		printf("OK\n");
 	}
